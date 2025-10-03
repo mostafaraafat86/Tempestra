@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tempestra - NASA Weather Likelihood</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+      #map { height: 60vh; }
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 0 12px; }
+      .panel { margin: 8px 0; }
+      label { display: inline-block; min-width: 120px; }
+      .result { padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <h2>Tempestra - NASA Weather Likelihood</h2>
+    <div id="map"></div>
+    <div class="panel">
+      <label>Variable:</label>
+      <select id="var">
+        <option value="T2M_MAX">Very hot (T2M_MAX)</option>
+        <option value="T2M_MIN">Very cold (T2M_MIN)</option>
+        <option value="WS10M">Very windy (WS10M)</option>
+        <option value="PRECTOTCORR">Very wet (PRECTOTCORR)</option>
+        <option value="T2M">Uncomfortable (use with HI threshold)</option>
+      </select>
+    </div>
+    <div class="panel">
+      <label>Date:</label>
+      <input type="date" id="date" />
+    </div>
+    <div class="panel">
+      <label>Threshold:</label>
+      <input type="number" id="threshold" step="0.1" value="32" />
+      <select id="comparison">
+        <option value="gt">&gt;</option>
+        <option value="lt">&lt;</option>
+      </select>
+      <label>Window (days):</label>
+      <input type="number" id="window" value="15" min="0" max="60" />
+    </div>
+    <button id="run">Compute probability at pin</button>
+    <div class="panel result" id="output">Drop a pin on the map and click Compute.</div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+  </body>
+  </html>
+
+
