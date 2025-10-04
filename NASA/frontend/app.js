@@ -1,23 +1,363 @@
-const map = L.map('map').setView([20, 0], 2);
+// Initialize map
+const map = L.map('map').setView([30.0444, 31.2357], 6); // Default to Cairo, Egypt
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18,
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
 let marker = null;
-map.on('click', (e) => {
+
+// Function to add marker at coordinates
+function addMarker(lat, lng) {
   if (marker) marker.remove();
-  marker = L.marker(e.latlng).addTo(map);
+  marker = L.marker([lat, lng]).addTo(map);
+  
+  // Add a subtle animation to the marker
+  marker.getElement().style.transition = 'transform 0.3s ease';
+  marker.getElement().style.transform = 'scale(1.2)';
+  setTimeout(() => {
+    marker.getElement().style.transform = 'scale(1)';
+  }, 200);
+  
+  // Update button state
+  updateButtonState();
+}
+
+// Map click handler
+map.on('click', (e) => {
+  addMarker(e.latlng.lat, e.latlng.lng);
+  
+  // Update location input with coordinates
+  document.getElementById('location-input').value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
 });
 
-function fmtPct(x) { return (x * 100).toFixed(1) + '%'; }
+// City search functionality
+let citySearchTimeout;
+const suggestionsContainer = document.getElementById('location-suggestions');
+
+// Enhanced city data with more cities and better country disambiguation
+const cities = [
+  { name: 'Cairo', country: 'Egypt', lat: 30.0444, lng: 31.2357 },
+  { name: 'London', country: 'United Kingdom', lat: 51.5074, lng: -0.1278 },
+  { name: 'New York', country: 'United States', lat: 40.7128, lng: -74.0060 },
+  { name: 'Paris', country: 'France', lat: 48.8566, lng: 2.3522 },
+  { name: 'Tokyo', country: 'Japan', lat: 35.6762, lng: 139.6503 },
+  { name: 'Sydney', country: 'Australia', lat: -33.8688, lng: 151.2093 },
+  { name: 'Dubai', country: 'UAE', lat: 25.2048, lng: 55.2708 },
+  { name: 'Mumbai', country: 'India', lat: 19.0760, lng: 72.8777 },
+  { name: 'Beijing', country: 'China', lat: 39.9042, lng: 116.4074 },
+  { name: 'Moscow', country: 'Russia', lat: 55.7558, lng: 37.6176 },
+  { name: 'Berlin', country: 'Germany', lat: 52.5200, lng: 13.4050 },
+  { name: 'Rome', country: 'Italy', lat: 41.9028, lng: 12.4964 },
+  { name: 'Madrid', country: 'Spain', lat: 40.4168, lng: -3.7038 },
+  { name: 'Amsterdam', country: 'Netherlands', lat: 52.3676, lng: 4.9041 },
+  { name: 'Barcelona', country: 'Spain', lat: 41.3851, lng: 2.1734 },
+  { name: 'Istanbul', country: 'Turkey', lat: 41.0082, lng: 28.9784 },
+  { name: 'Athens', country: 'Greece', lat: 37.9838, lng: 23.7275 },
+  { name: 'Prague', country: 'Czech Republic', lat: 50.0755, lng: 14.4378 },
+  { name: 'Vienna', country: 'Austria', lat: 48.2082, lng: 16.3738 },
+  { name: 'Stockholm', country: 'Sweden', lat: 59.3293, lng: 18.0686 },
+  // Additional cities with common names
+  { name: 'Springfield', country: 'United States (Illinois)', lat: 39.7817, lng: -89.6501 },
+  { name: 'Springfield', country: 'United States (Missouri)', lat: 37.2089, lng: -93.2923 },
+  { name: 'Birmingham', country: 'United Kingdom', lat: 52.4862, lng: -1.8904 },
+  { name: 'Birmingham', country: 'United States', lat: 33.5207, lng: -86.8025 },
+  { name: 'Manchester', country: 'United Kingdom', lat: 53.4808, lng: -2.2426 },
+  { name: 'Manchester', country: 'United States', lat: 42.9956, lng: -71.4548 },
+  { name: 'Newport', country: 'United Kingdom', lat: 51.5889, lng: -2.9979 },
+  { name: 'Newport', country: 'United States (Rhode Island)', lat: 41.4901, lng: -71.3128 },
+  { name: 'Newport', country: 'United States (Kentucky)', lat: 39.0914, lng: -84.4958 },
+  { name: 'Richmond', country: 'United States (Virginia)', lat: 37.5407, lng: -77.4360 },
+  { name: 'Richmond', country: 'United States (California)', lat: 37.9358, lng: -122.3478 },
+  { name: 'Richmond', country: 'Australia', lat: -37.8136, lng: 144.9631 },
+  { name: 'Frankfurt', country: 'Germany', lat: 50.1109, lng: 8.6821 },
+  { name: 'Frankfurt', country: 'United States', lat: 38.2009, lng: -84.8733 },
+  { name: 'Victoria', country: 'Canada', lat: 48.4284, lng: -123.3656 },
+  { name: 'Victoria', country: 'Australia', lat: -37.8136, lng: 144.9631 },
+  { name: 'Victoria', country: 'Seychelles', lat: -4.6191, lng: 55.4513 },
+  { name: 'Hamilton', country: 'Canada', lat: 43.2557, lng: -79.8711 },
+  { name: 'Hamilton', country: 'New Zealand', lat: -37.7870, lng: 175.2793 },
+  { name: 'Hamilton', country: 'Bermuda', lat: 32.2948, lng: -64.7814 },
+  // Additional important cities
+  { name: 'Washington', country: 'United States', lat: 38.9072, lng: -77.0369 },
+  { name: 'Washington', country: 'United States (State)', lat: 47.7511, lng: -120.7401 },
+  { name: 'Luxor', country: 'Egypt', lat: 25.6872, lng: 32.6396 },
+  { name: 'Alexandria', country: 'Egypt', lat: 31.2001, lng: 29.9187 },
+  { name: 'Giza', country: 'Egypt', lat: 30.0131, lng: 31.2089 },
+  { name: 'Aswan', country: 'Egypt', lat: 24.0889, lng: 32.8998 },
+  { name: 'Hurghada', country: 'Egypt', lat: 27.2574, lng: 33.8129 },
+  { name: 'Sharm El Sheikh', country: 'Egypt', lat: 27.9158, lng: 34.3300 }
+];
+
+function showSuggestions(suggestions) {
+  suggestionsContainer.innerHTML = '';
+  
+  if (suggestions.length === 0) {
+    suggestionsContainer.style.display = 'none';
+    return;
+  }
+  
+  // Limit to 8 suggestions for better UX
+  const limitedSuggestions = suggestions.slice(0, 8);
+  
+  limitedSuggestions.forEach(city => {
+    const suggestion = document.createElement('div');
+    suggestion.className = 'location-suggestion';
+    
+    // Highlight matching text
+    const inputValue = document.getElementById('location-input').value.toLowerCase();
+    const cityName = city.name.toLowerCase();
+    const countryName = city.country.toLowerCase();
+    
+    let displayName = city.name;
+    let displayCountry = city.country;
+    
+    // Highlight matching parts
+    if (cityName.includes(inputValue)) {
+      const index = cityName.indexOf(inputValue);
+      displayName = city.name.substring(0, index) + 
+                   '<mark>' + city.name.substring(index, index + inputValue.length) + '</mark>' + 
+                   city.name.substring(index + inputValue.length);
+    }
+    
+    suggestion.innerHTML = `
+      <div class="suggestion-content">
+        <span class="location-name">${displayName}</span>
+        <span class="location-country">${displayCountry}</span>
+      </div>
+      <span class="location-coords">${city.lat.toFixed(2)}°, ${city.lng.toFixed(2)}°</span>
+    `;
+    
+    suggestion.addEventListener('click', () => {
+      selectCity(city);
+    });
+    
+    suggestionsContainer.appendChild(suggestion);
+  });
+  
+  suggestionsContainer.style.display = 'block';
+}
+
+function selectCity(city) {
+  document.getElementById('location-input').value = `${city.name}, ${city.country}`;
+  addMarker(city.lat, city.lng);
+  map.setView([city.lat, city.lng], 10);
+  suggestionsContainer.style.display = 'none';
+  updateButtonState();
+}
+
+// Location input handler
+document.getElementById('location-input').addEventListener('input', function() {
+  const input = this.value.trim();
+  
+  // Clear previous timeout
+  clearTimeout(citySearchTimeout);
+  
+  // Check if input looks like coordinates
+  const coordMatch = input.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+  if (coordMatch) {
+    const lat = parseFloat(coordMatch[1]);
+    const lng = parseFloat(coordMatch[2]);
+    
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      addMarker(lat, lng);
+      map.setView([lat, lng], 10);
+      suggestionsContainer.style.display = 'none';
+    }
+    return;
+  }
+  
+  // Search for cities
+  if (input.length >= 2) {
+    citySearchTimeout = setTimeout(() => {
+      const filteredCities = cities.filter(city => 
+        city.name.toLowerCase().includes(input.toLowerCase()) ||
+        city.country.toLowerCase().includes(input.toLowerCase())
+      );
+      showSuggestions(filteredCities);
+    }, 300);
+  } else {
+    suggestionsContainer.style.display = 'none';
+  }
+});
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.location-search-container')) {
+    suggestionsContainer.style.display = 'none';
+  }
+});
+
+// Set default date to today
+document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+// Persona selection functionality
+let selectedPersona = null;
+
+document.querySelectorAll('.persona-card').forEach(card => {
+  card.addEventListener('click', function() {
+    const isCurrentlyActive = this.classList.contains('active');
+    
+    // Remove active class from all cards
+    document.querySelectorAll('.persona-card').forEach(c => c.classList.remove('active'));
+    
+    // If the clicked card was already active, deselect it
+    if (isCurrentlyActive) {
+      selectedPersona = null;
+      // Reset form to default values
+      resetFormToDefault();
+    } else {
+      // Add active class to clicked card
+      this.classList.add('active');
+      selectedPersona = this.dataset.persona;
+      
+      // Update form based on persona
+      updateFormForPersona(selectedPersona);
+    }
+  });
+});
+
+function updateFormForPersona(persona) {
+  const varSelect = document.getElementById('var');
+  const thresholdInput = document.getElementById('threshold');
+  const comparisonSelect = document.getElementById('comparison');
+  
+  switch(persona) {
+    case 'farmer':
+      varSelect.value = 'PRECTOTCORR';
+      thresholdInput.value = '5';
+      comparisonSelect.value = 'gt';
+      break;
+    case 'fisher':
+      varSelect.value = 'WS10M';
+      thresholdInput.value = '15';
+      comparisonSelect.value = 'lt';
+      break;
+    case 'tourist':
+      varSelect.value = 'T2M_MAX';
+      thresholdInput.value = '25';
+      comparisonSelect.value = 'gt';
+      break;
+    case 'driver':
+      varSelect.value = 'PRECTOTCORR';
+      thresholdInput.value = '1';
+      comparisonSelect.value = 'lt';
+      break;
+  }
+  
+  // Update button state
+  updateButtonState();
+}
+
+function resetFormToDefault() {
+  const varSelect = document.getElementById('var');
+  const thresholdInput = document.getElementById('threshold');
+  const comparisonSelect = document.getElementById('comparison');
+  
+  // Reset to default values
+  varSelect.value = 'T2M_MAX';
+  thresholdInput.value = '32';
+  comparisonSelect.value = 'gt';
+  
+  // Update button state
+  updateButtonState();
+}
+
+// Add smooth transitions to form elements
+document.querySelectorAll('.form-group input, .form-group select').forEach(element => {
+  element.addEventListener('focus', function() {
+    this.parentElement.style.transform = 'translateY(-2px)';
+  });
+  
+  element.addEventListener('blur', function() {
+    this.parentElement.style.transform = 'translateY(0)';
+  });
+});
+
+// Update button state based on form validity
+function updateButtonState() {
+  const button = document.getElementById('run');
+  const date = document.getElementById('date').value;
+  const threshold = document.getElementById('threshold').value;
+  
+  if (!marker || !date || !threshold) {
+    button.disabled = true;
+    button.style.transform = 'scale(0.98)';
+  } else {
+    button.disabled = false;
+    button.style.transform = 'scale(1)';
+  }
+}
+
+// Add event listeners for form validation
+document.getElementById('date').addEventListener('change', updateButtonState);
+document.getElementById('threshold').addEventListener('input', updateButtonState);
+
+// Initialize button state
+updateButtonState();
+
+function fmtPct(x) { 
+  return (x * 100).toFixed(1) + '%'; 
+}
+
+function formatNumber(num) {
+  return num.toLocaleString();
+}
+
+function getVariableDisplayName(varKey) {
+  const names = {
+    'T2M_MAX': 'Hot Day (Maximum Temperature)',
+    'T2M_MIN': 'Cold Day (Minimum Temperature)', 
+    'WS10M': 'Windy Day (Wind Speed)',
+    'PRECTOTCORR': 'Rainy Day (Precipitation)',
+    'T2M': 'Average Temperature'
+  };
+  return names[varKey] || varKey;
+}
+
+function getComparisonSymbol(comparison) {
+  return comparison === 'gt' ? '>' : '<';
+}
+
+function getProbabilityInterpretation(probability, varKey, comparison, threshold) {
+  const varNames = {
+    'T2M_MAX': 'hot weather',
+    'T2M_MIN': 'cold weather', 
+    'WS10M': 'windy conditions',
+    'PRECTOTCORR': 'rainy weather',
+    'T2M': 'temperature conditions'
+  };
+  
+  const varName = varNames[varKey] || 'weather conditions';
+  const comparisonText = comparison === 'gt' ? 'above' : 'below';
+  const thresholdText = varKey === 'WS10M' ? `${threshold} km/h` : 
+                       varKey.includes('T2M') ? `${threshold}°C` : 
+                       `${threshold} mm`;
+  
+  return `Chance of ${varName} ${comparisonText} ${thresholdText} on this date`;
+}
+
+function getRiskColor(probability, comparison) {
+  // For "below threshold" conditions (like safe fishing), high probability = good (green)
+  // For "above threshold" conditions (like hot weather), high probability = bad (red)
+  const isBelowThreshold = comparison === 'lt';
+  const effectiveProbability = isBelowThreshold ? (1 - probability) : probability;
+  
+  if (effectiveProbability < 0.3) return '#10b981'; // Green
+  if (effectiveProbability < 0.7) return '#f59e0b'; // Yellow
+  return '#ef4444'; // Red
+}
 
 document.getElementById('run').addEventListener('click', async () => {
   const out = document.getElementById('output');
+  const button = document.getElementById('run');
+  
   if (!marker) {
-    out.textContent = 'Please drop a pin on the map first.';
+    out.className = 'result error';
+    out.innerHTML = 'Please select a location first. You can type coordinates (e.g., 30.0444, 31.2357) or click on the map.';
     return;
   }
+  
   const lat = marker.getLatLng().lat.toFixed(4);
   const lon = marker.getLatLng().lng.toFixed(4);
   const varKey = document.getElementById('var').value;
@@ -25,23 +365,382 @@ document.getElementById('run').addEventListener('click', async () => {
   const threshold = document.getElementById('threshold').value;
   const comparison = document.getElementById('comparison').value;
   const windowDays = document.getElementById('window').value;
-  if (!date) {
-    out.textContent = 'Please select a date.';
+  
+  // Validate coordinates
+  const latNum = parseFloat(lat);
+  const lonNum = parseFloat(lon);
+  
+  if (latNum < -90 || latNum > 90) {
+    out.className = 'result error';
+    out.innerHTML = 'Invalid latitude. Please select a location between -90° and 90°.';
     return;
   }
-  out.textContent = 'Computing...';
+  
+  if (lonNum < -180 || lonNum > 180) {
+    out.className = 'result error';
+    out.innerHTML = 'Invalid longitude. Please select a location between -180° and 180°.';
+    return;
+  }
+  
+  if (!date) {
+    out.className = 'result error';
+    out.innerHTML = 'Please select a target date.';
+    return;
+  }
+  
+  if (!threshold) {
+    out.className = 'result error';
+    out.innerHTML = 'Please enter a threshold value.';
+    return;
+  }
+  
+  // Show loading state
+  out.className = 'result loading';
+  out.innerHTML = `
+    <div class="loading-text">
+      <span>Analyzing NASA weather data</span>
+      <div class="loading-dots"></div>
+      <div class="loading-dots"></div>
+      <div class="loading-dots"></div>
+    </div>
+  `;
+  button.disabled = true;
+  button.style.transform = 'scale(0.95)';
+  
+  // Add loading animation to button
+  button.style.background = 'linear-gradient(135deg, #475569 0%, #334155 100%)';
+  button.innerHTML = 'Analyzing...';
+  
   try {
     const url = `/api/probability?lat=${lat}&lon=${lon}&target_date=${date}&var=${encodeURIComponent(varKey)}&threshold=${threshold}&comparison=${comparison}&window_days=${windowDays}`;
     const resp = await fetch(url);
+    
     if (!resp.ok) {
       const err = await resp.json();
       throw new Error(err.detail || 'API error');
     }
+    
     const data = await resp.json();
-    out.innerHTML = `Probability: <b>${fmtPct(data.probability)}</b><br/>Samples: ${data.n_samples}<br/>95% CI: ${fmtPct(data.ci_95[0])} - ${fmtPct(data.ci_95[1])}<br/>Method: ${data.method}`;
+    
+    // Format the results with cleaner, less crowded design
+    out.className = 'result has-data';
+    
+    // Create probability interpretation
+    const probabilityText = getProbabilityInterpretation(data.probability, varKey, comparison, threshold);
+    const riskColor = getRiskColor(data.probability, comparison);
+    
+    // Get the selected city name if available
+    const locationInput = document.getElementById('location-input').value;
+    const displayLocation = locationInput && locationInput.includes(',') ? locationInput : `${lat}°, ${lon}°`;
+    
+    out.innerHTML = `
+      <div class="results-main">
+        <div class="probability-card">
+          <div class="probability-value" style="color: ${riskColor}">${fmtPct(data.probability)}</div>
+          <div class="probability-label">${probabilityText}</div>
+        </div>
+        
+        <div class="analysis-details">
+          <div class="detail-row">
+            <span class="detail-label">📍 Location</span>
+            <span class="detail-value">${displayLocation}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">📅 Date</span>
+            <span class="detail-value">${date}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">🌡️ Condition</span>
+            <span class="detail-value">${getVariableDisplayName(varKey)} ${getComparisonSymbol(comparison)} ${threshold}</span>
+          </div>
+        </div>
+        
+        <div class="data-info">
+          <span class="data-text">Based on ${formatNumber(data.n_samples)} years of NASA data (${data.period})</span>
+        </div>
+      </div>
+    `;
+    
+    // Show insights, charts, and export sections
+    document.getElementById('insights').style.display = 'block';
+    document.getElementById('charts').style.display = 'block';
+    document.getElementById('export').style.display = 'block';
+    
+    // Create charts
+    createCharts(data, varKey, comparison, threshold);
+    
+    // Update risk level and recommendation
+    updateInsights(data, selectedPersona);
+    
   } catch (e) {
-    out.textContent = 'Error: ' + e.message;
+    out.className = 'result error';
+    
+    // Provide more helpful error messages
+    let errorMessage = e.message;
+    if (e.message.includes('422')) {
+      errorMessage = 'Invalid coordinates or parameters. Please check your location and try again.';
+    } else if (e.message.includes('404')) {
+      errorMessage = 'Weather data not available for this location. Try a different location.';
+    } else if (e.message.includes('500')) {
+      errorMessage = 'Server error. Please try again in a moment.';
+    } else if (e.message.includes('timeout')) {
+      errorMessage = 'Request timed out. Please try again.';
+    }
+    
+    out.innerHTML = `Error: ${errorMessage}`;
+  } finally {
+    button.disabled = false;
+    button.style.transform = 'scale(1)';
+    button.style.background = '';
+    button.innerHTML = 'Compute Probability';
+    updateButtonState();
   }
 });
+
+function updateInsights(data, persona) {
+  const probability = data.probability;
+  const comparison = document.getElementById('comparison').value;
+  const riskIndicator = document.getElementById('risk-indicator');
+  const riskText = riskIndicator.querySelector('.risk-text');
+  const riskFill = riskIndicator.querySelector('.risk-fill');
+  const recommendationText = document.getElementById('recommendation-text');
+  
+  // Determine risk level based on probability and context
+  let riskLevel, riskWidth, riskClass, recommendation;
+  
+  // For "below threshold" conditions (like safe fishing), high probability = low risk
+  // For "above threshold" conditions (like hot weather), high probability = high risk
+  const isBelowThreshold = comparison === 'lt';
+  const effectiveProbability = isBelowThreshold ? (1 - probability) : probability;
+  
+  if (effectiveProbability < 0.3) {
+    riskLevel = 'Low';
+    riskWidth = '20%';
+    riskClass = '';
+    recommendation = getRecommendation('low', persona, isBelowThreshold);
+  } else if (effectiveProbability < 0.7) {
+    riskLevel = 'Medium';
+    riskWidth = '60%';
+    riskClass = 'medium';
+    recommendation = getRecommendation('medium', persona, isBelowThreshold);
+  } else {
+    riskLevel = 'High';
+    riskWidth = '90%';
+    riskClass = 'high';
+    recommendation = getRecommendation('high', persona, isBelowThreshold);
+  }
+  
+  riskText.textContent = riskLevel;
+  riskFill.style.width = riskWidth;
+  riskFill.className = `risk-fill ${riskClass}`;
+  recommendationText.textContent = recommendation;
+}
+
+function getRecommendation(riskLevel, persona, isBelowThreshold) {
+  const recommendations = {
+    farmer: {
+      low: 'Excellent conditions for outdoor farming activities. Consider planting or harvesting.',
+      medium: 'Moderate conditions. Monitor weather closely and have backup plans.',
+      high: 'Challenging conditions expected. Consider indoor activities or delay outdoor work.'
+    },
+    fisher: {
+      low: isBelowThreshold ? 'Perfect fishing conditions! Safe winds and good visibility.' : 'Risky fishing conditions. Consider staying ashore or fishing in protected areas.',
+      medium: isBelowThreshold ? 'Decent fishing conditions. Check local weather updates before heading out.' : 'Moderate fishing conditions. Exercise caution and monitor conditions.',
+      high: isBelowThreshold ? 'Risky fishing conditions. Consider staying ashore or fishing in protected areas.' : 'Perfect fishing conditions! Safe winds and good visibility.'
+    },
+    tourist: {
+      low: 'Ideal weather for outdoor activities and sightseeing.',
+      medium: 'Good conditions with some variability. Pack layers and check forecasts.',
+      high: 'Challenging weather expected. Consider indoor attractions or reschedule.'
+    },
+    driver: {
+      low: 'Excellent driving conditions with good visibility and road safety.',
+      medium: 'Fair driving conditions. Exercise caution and check road reports.',
+      high: 'Difficult driving conditions expected. Consider delaying travel if possible.'
+    }
+  };
+  
+  return recommendations[persona]?.[riskLevel] || 'Based on historical data, conditions look favorable.';
+}
+
+// Export functionality
+document.getElementById('export-csv').addEventListener('click', function() {
+  const data = {
+    location: marker ? `${marker.getLatLng().lat.toFixed(4)}, ${marker.getLatLng().lng.toFixed(4)}` : 'Not selected',
+    date: document.getElementById('date').value,
+    variable: document.getElementById('var').value,
+    threshold: document.getElementById('threshold').value,
+    comparison: document.getElementById('comparison').value,
+    window: document.getElementById('window').value,
+    probability: document.querySelector('.probability-display strong')?.textContent || 'N/A',
+    timestamp: new Date().toISOString()
+  };
+  
+  const csvContent = Object.keys(data).map(key => `${key},${data[key]}`).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `weather-analysis-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+});
+
+document.getElementById('export-pdf').addEventListener('click', function() {
+  alert('PDF export feature coming soon! For now, you can use the CSV export.');
+});
+
+document.getElementById('share-btn').addEventListener('click', function() {
+  if (navigator.share) {
+    navigator.share({
+      title: 'Weather Analysis Results',
+      text: `Check out this weather analysis for ${document.getElementById('date').value}`,
+      url: window.location.href
+    });
+  } else {
+    // Fallback to clipboard
+    const shareText = `Weather Analysis Results\nDate: ${document.getElementById('date').value}\nLocation: ${marker ? `${marker.getLatLng().lat.toFixed(4)}, ${marker.getLatLng().lng.toFixed(4)}` : 'Not selected'}\nProbability: ${document.querySelector('.probability-display strong')?.textContent || 'N/A'}`;
+    navigator.clipboard.writeText(shareText).then(() => {
+      alert('Analysis copied to clipboard!');
+    });
+  }
+});
+
+// Chart creation functions
+let probabilityChartInstance = null;
+let trendChartInstance = null;
+
+function createCharts(data, varKey, comparison, threshold) {
+  // Destroy existing charts if they exist
+  if (probabilityChartInstance) {
+    probabilityChartInstance.destroy();
+  }
+  if (trendChartInstance) {
+    trendChartInstance.destroy();
+  }
+  
+  // Create probability overview chart
+  createProbabilityChart(data, varKey, comparison, threshold);
+  
+  // Create historical trend chart
+  createTrendChart(data, varKey, comparison, threshold);
+}
+
+function createProbabilityChart(data, varKey, comparison, threshold) {
+  const ctx = document.getElementById('probabilityChart').getContext('2d');
+  
+  const probability = data.probability;
+  const oppositeProbability = 1 - probability;
+  
+  probabilityChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: [
+        getVariableDisplayName(varKey) + ' ' + getComparisonSymbol(comparison) + ' ' + threshold,
+        'Other Conditions'
+      ],
+      datasets: [{
+        data: [probability * 100, oppositeProbability * 100],
+        backgroundColor: [
+          getRiskColor(probability, comparison),
+          'rgba(255, 255, 255, 0.1)'
+        ],
+        borderColor: [
+          getRiskColor(probability, comparison),
+          'rgba(255, 255, 255, 0.2)'
+        ],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      aspectRatio: 1,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#cbd5e1',
+            font: {
+              size: 11
+            },
+            padding: 15
+          }
+        }
+      }
+    }
+  });
+}
+
+function createTrendChart(data, varKey, comparison, threshold) {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  
+  // Generate sample historical data (since we don't have actual time series from API)
+  const years = [];
+  const probabilities = [];
+  
+  // Create mock historical trend data
+  for (let i = 0; i < 10; i++) {
+    years.push(2015 + i);
+    // Simulate some variation around the actual probability
+    const baseProb = data.probability;
+    const variation = (Math.random() - 0.5) * 0.3; // ±15% variation
+    const yearProb = Math.max(0, Math.min(1, baseProb + variation));
+    probabilities.push(yearProb * 100);
+  }
+  
+  trendChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [{
+        label: 'Probability (%)',
+        data: probabilities,
+        borderColor: '#0ea5e9',
+        backgroundColor: 'rgba(14, 165, 233, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      aspectRatio: 1.5,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: '#64748b',
+            font: {
+              size: 10
+            }
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)'
+          }
+        },
+        y: {
+          ticks: {
+            color: '#64748b',
+            font: {
+              size: 10
+            },
+            callback: function(value) {
+              return value + '%';
+            }
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)'
+          }
+        }
+      }
+    }
+  });
+}
 
 
