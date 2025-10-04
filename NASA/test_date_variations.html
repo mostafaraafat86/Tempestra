@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Date Variations Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #5a1a1a;
+            color: #ff6b6b;
+        }
+        .success {
+            background: #1a5a1a;
+            color: #6bff6b;
+        }
+        .date-test {
+            background: #444;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .weather-data {
+            background: #555;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        input[type="text"] {
+            width: 200px;
+            padding: 8px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            background: #333;
+            color: #fff;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📅 Date Variations Test</h1>
+    
+    <div class="test-container">
+        <h2>Test Different Dates</h2>
+        <p>This test verifies that the chatbot works with different dates and provides varying weather data.</p>
+        
+        <div>
+            <input type="text" id="customDate" placeholder="Enter date (e.g., 15/06/2025)" value="15/06/2025">
+            <button class="test-button" onclick="testCustomDate()">Test Custom Date</button>
+        </div>
+        
+        <button class="test-button" onclick="runAllDateTests()">Run All Date Tests</button>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        async function testCustomDate() {
+            const customDate = document.getElementById('customDate').value;
+            if (!customDate) {
+                alert('Please enter a date');
+                return;
+            }
+            
+            await testSingleDate(customDate, 'Custom Date Test');
+        }
+        
+        async function runAllDateTests() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result">Running date tests...</div>';
+            
+            const testDates = [
+                { date: '2025-01-15', name: 'January (Winter)' },
+                { date: '2025-04-15', name: 'April (Spring)' },
+                { date: '2025-07-15', name: 'July (Summer)' },
+                { date: '2025-10-15', name: 'October (Fall)' },
+                { date: '15/01/2025', name: 'January (DD/MM/YYYY format)' },
+                { date: '07/15/2025', name: 'July (MM/DD/YYYY format)' },
+                { date: '2025-12-25', name: 'Christmas Day' }
+            ];
+            
+            let allResults = '';
+            
+            for (const testDate of testDates) {
+                const result = await testSingleDate(testDate.date, testDate.name);
+                allResults += result + '\n\n';
+            }
+            
+            resultsDiv.innerHTML = `<div class="result">${allResults}</div>`;
+        }
+        
+        async function testSingleDate(dateStr, testName) {
+            try {
+                const response = await fetch(`${API_BASE}/chatbot`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: "I'm a farmer and want to know if it's good to plant crops today",
+                        location: {
+                            lat: 30.0444,
+                            lng: 31.2357,
+                            name: "Cairo, Egypt"
+                        },
+                        target_date: dateStr
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Extract weather data from response
+                const weatherData = extractWeatherData(data.response);
+                
+                return `📅 ${testName} (${dateStr}):
+${weatherData}
+Status: ✅ Success`;
+                
+            } catch (error) {
+                return `📅 ${testName} (${dateStr}):
+❌ Error: ${error.message}`;
+            }
+        }
+        
+        function extractWeatherData(responseText) {
+            const lines = responseText.split('\n');
+            const weatherLines = [];
+            
+            for (const line of lines) {
+                if (line.includes('🌧️') || line.includes('🌡️') || line.includes('💨')) {
+                    weatherLines.push(line.trim());
+                }
+            }
+            
+            if (weatherLines.length === 0) {
+                return 'No weather data found in response';
+            }
+            
+            return weatherLines.join('\n');
+        }
+        
+        // Test on page load
+        window.onload = function() {
+            // Check if server is running
+            fetch(`${API_BASE}/health`)
+                .then(response => {
+                    if (response.ok) {
+                        document.getElementById('results').innerHTML = '<div class="result success">✅ Server is running - ready to test different dates!</div>';
+                    } else {
+                        document.getElementById('results').innerHTML = '<div class="result error">❌ Server not responding</div>';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('results').innerHTML = '<div class="result error">❌ Server not running - please start the server first</div>';
+                });
+        };
+    </script>
+</body>
+</html>

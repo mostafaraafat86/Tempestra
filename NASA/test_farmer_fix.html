@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmer Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #5a1a1a;
+            color: #ff6b6b;
+        }
+        .success {
+            background: #1a5a1a;
+            color: #6bff6b;
+        }
+        .conversation {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+        .user-message {
+            background: #444;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .bot-message {
+            background: #555;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌾 Farmer Fix Test</h1>
+    
+    <div class="test-container">
+        <h2>Test Scenario: Farmer in Cairo</h2>
+        <p>This test simulates the exact conversation you had:</p>
+        <ol>
+            <li>User: "I'm a farmer in Cairo, Egypt - is it good to plant crops today?"</li>
+            <li>Bot: Asks for coordinates</li>
+            <li>User: "30.0947, 31.2767"</li>
+            <li>Bot: Should give farming advice (not fishing advice)</li>
+        </ol>
+        
+        <button class="test-button" onclick="runFarmerTest()">Run Farmer Test</button>
+        <div id="conversation"></div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        async function runFarmerTest() {
+            const conversationDiv = document.getElementById('conversation');
+            const resultDiv = document.getElementById('result');
+            
+            conversationDiv.innerHTML = '<div class="conversation">Starting farmer test...</div>';
+            resultDiv.innerHTML = '';
+            
+            try {
+                // Step 1: Farmer asks about farming
+                conversationDiv.innerHTML += '<div class="user-message">👤 User: "I\'m a farmer in Cairo, Egypt - is it good to plant crops today?"</div>';
+                
+                const response1 = await fetch(`${API_BASE}/chatbot`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: "I'm a farmer in Cairo, Egypt - is it good to plant crops today?",
+                        location: null,
+                        target_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                if (!response1.ok) {
+                    throw new Error(`HTTP ${response1.status}: ${response1.statusText}`);
+                }
+                
+                const data1 = await response1.json();
+                conversationDiv.innerHTML += `<div class="bot-message">🤖 Bot: ${data1.response}</div>`;
+                
+                // Check if bot correctly identified farmer
+                if (data1.user_type === 'farmer') {
+                    conversationDiv.innerHTML += '<div class="result success">✅ Correctly identified as farmer</div>';
+                } else {
+                    conversationDiv.innerHTML += `<div class="result error">❌ Incorrectly identified as: ${data1.user_type || 'unknown'}</div>`;
+                }
+                
+                // Step 2: User provides coordinates
+                conversationDiv.innerHTML += '<div class="user-message">👤 User: "30.0947, 31.2767"</div>';
+                
+                const response2 = await fetch(`${API_BASE}/chatbot`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: "30.0947, 31.2767",
+                        location: {
+                            lat: 30.0947,
+                            lng: 31.2767,
+                            name: "Cairo, Egypt"
+                        },
+                        target_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                if (!response2.ok) {
+                    throw new Error(`HTTP ${response2.status}: ${response2.statusText}`);
+                }
+                
+                const data2 = await response2.json();
+                conversationDiv.innerHTML += `<div class="bot-message">🤖 Bot: ${data2.response}</div>`;
+                
+                // Analyze the response
+                let analysis = '';
+                
+                // Check if it's farming advice (not fishing)
+                if (data2.response.includes('🌾') || data2.response.includes('Farming') || data2.response.includes('farming')) {
+                    analysis += '✅ Correctly gave farming advice\n';
+                } else if (data2.response.includes('🎣') || data2.response.includes('Fishing') || data2.response.includes('fishing')) {
+                    analysis += '❌ Incorrectly gave fishing advice instead of farming advice\n';
+                } else {
+                    analysis += '⚠️ Response type unclear\n';
+                }
+                
+                // Check for negative values
+                if (data2.response.includes('-') && /\d+\.\d+/.test(data2.response)) {
+                    analysis += '❌ Response contains negative weather values\n';
+                } else {
+                    analysis += '✅ No negative weather values found\n';
+                }
+                
+                // Check user type
+                if (data2.user_type === 'farmer') {
+                    analysis += '✅ Correctly maintained farmer user type\n';
+                } else {
+                    analysis += `❌ User type changed to: ${data2.user_type || 'unknown'}\n`;
+                }
+                
+                resultDiv.innerHTML = `<div class="result">Analysis:\n${analysis}</div>`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Test on page load
+        window.onload = function() {
+            // Check if server is running
+            fetch(`${API_BASE}/health`)
+                .then(response => {
+                    if (response.ok) {
+                        document.getElementById('conversation').innerHTML = '<div class="conversation success">✅ Server is running - ready to test!</div>';
+                    } else {
+                        document.getElementById('conversation').innerHTML = '<div class="conversation error">❌ Server not responding</div>';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('conversation').innerHTML = '<div class="conversation error">❌ Server not running - please start the server first</div>';
+                });
+        };
+    </script>
+</body>
+</html>
