@@ -1069,6 +1069,113 @@ document.getElementById('export-csv').addEventListener('click', function() {
   window.URL.revokeObjectURL(url);
 });
 
+document.getElementById('export-json').addEventListener('click', function() {
+  let locationInfo;
+  if (marker) {
+    locationInfo = {
+      type: 'point',
+      coordinates: {
+        lat: marker.getLatLng().lat,
+        lng: marker.getLatLng().lng
+      },
+      display: `${marker.getLatLng().lat.toFixed(4)}, ${marker.getLatLng().lng.toFixed(4)}`
+    };
+  } else if (selectedArea) {
+    const center = selectedArea.getBounds().getCenter();
+    const area = calculateArea(selectedArea.getBounds());
+    locationInfo = {
+      type: 'area',
+      coordinates: {
+        center: {
+          lat: center.lat,
+          lng: center.lng
+        },
+        bounds: {
+          north: selectedArea.getBounds().getNorth(),
+          south: selectedArea.getBounds().getSouth(),
+          east: selectedArea.getBounds().getEast(),
+          west: selectedArea.getBounds().getWest()
+        }
+      },
+      area_km2: area,
+      display: `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)} (Area: ${area.toFixed(2)} km²)`
+    };
+  } else {
+    locationInfo = {
+      type: 'none',
+      display: 'Not selected'
+    };
+  }
+  
+  // Get analysis results
+  const probabilityValue = document.querySelector('.probability-value');
+  const probabilityLabel = document.querySelector('.probability-label');
+  const detailRows = document.querySelectorAll('.detail-row');
+  
+  // Build detailed analysis object
+  const analysis = {
+    probability: {
+      value: probabilityValue?.textContent || 'N/A',
+      description: probabilityLabel?.textContent || 'N/A',
+      color: probabilityValue?.style.color || '#000000'
+    },
+    details: []
+  };
+  
+  // Extract detail rows
+  detailRows.forEach(row => {
+    const label = row.querySelector('.detail-label');
+    const value = row.querySelector('.detail-value');
+    if (label && value) {
+      analysis.details.push({
+        label: label.textContent.trim(),
+        value: value.textContent.trim()
+      });
+    }
+  });
+  
+  // Get data source information
+  const dataText = document.querySelector('.data-text');
+  const dataSource = document.querySelector('.data-source');
+  const methodInfo = document.querySelector('.method-info');
+  
+  const dataSourceInfo = {
+    description: dataText?.textContent || '',
+    source: dataSource?.textContent || '',
+    method: methodInfo?.textContent || ''
+  };
+  
+  // Build comprehensive JSON data
+  const jsonData = {
+    metadata: {
+      application: 'TEMPESTRA - NASA Weather Likelihood',
+      version: '1.0',
+      generated_at: new Date().toISOString(),
+      generated_by: 'TEMPESTRA Web Interface'
+    },
+    analysis_parameters: {
+      date: document.getElementById('date').value,
+      variable: document.getElementById('var').value,
+      threshold: parseFloat(document.getElementById('threshold').value),
+      comparison: document.getElementById('comparison').value,
+      window_days: parseInt(document.getElementById('window').value)
+    },
+    location: locationInfo,
+    analysis_results: analysis,
+    data_source: dataSourceInfo
+  };
+  
+  // Create and download JSON file
+  const jsonContent = JSON.stringify(jsonData, null, 2);
+  const blob = new Blob([jsonContent], { type: 'application/json' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tempestra-analysis-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+});
+
 document.getElementById('export-pdf').addEventListener('click', async function() {
   const button = this;
   const originalText = button.textContent;
@@ -1190,6 +1297,77 @@ document.getElementById('export-pdf').addEventListener('click', async function()
     button.textContent = originalText;
     button.disabled = false;
   }
+});
+
+// JSON export functionality
+document.getElementById('export-json').addEventListener('click', function() {
+  let locationInfo;
+  if (marker) {
+    locationInfo = `${marker.getLatLng().lat.toFixed(4)}, ${marker.getLatLng().lng.toFixed(4)}`;
+  } else if (selectedArea) {
+    const center = selectedArea.getBounds().getCenter();
+    const area = calculateArea(selectedArea.getBounds());
+    locationInfo = `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)} (Area: ${area.toFixed(2)} km²)`;
+  } else {
+    locationInfo = 'Not selected';
+  }
+  
+  // Get additional analysis data for JSON export
+  const probabilityValue = document.querySelector('.probability-value');
+  const probabilityLabel = document.querySelector('.probability-label');
+  const detailRows = document.querySelectorAll('.detail-row');
+  const dataText = document.querySelector('.data-text');
+  const dataSource = document.querySelector('.data-source');
+  const methodInfo = document.querySelector('.method-info');
+  
+  // Build comprehensive data object
+  const data = {
+    metadata: {
+      location: locationInfo,
+      location_type: marker ? 'point' : (selectedArea ? 'area' : 'none'),
+      date: document.getElementById('date').value,
+      variable: document.getElementById('var').value,
+      threshold: document.getElementById('threshold').value,
+      comparison: document.getElementById('comparison').value,
+      window: document.getElementById('window').value,
+      timestamp: new Date().toISOString(),
+      generated_by: 'TEMPESTRA - NASA Weather Likelihood Analysis'
+    },
+    analysis: {
+      probability: {
+        value: probabilityValue?.textContent || 'N/A',
+        description: probabilityLabel?.textContent || 'N/A'
+      },
+      details: []
+    },
+    data_source: {
+      information: dataText?.textContent || 'N/A',
+      source: dataSource?.textContent || 'N/A',
+      method: methodInfo?.textContent || 'N/A'
+    }
+  };
+  
+  // Add detailed analysis information
+  detailRows.forEach(row => {
+    const label = row.querySelector('.detail-label');
+    const value = row.querySelector('.detail-value');
+    if (label && value) {
+      data.analysis.details.push({
+        label: label.textContent,
+        value: value.textContent
+      });
+    }
+  });
+  
+  // Convert to JSON and download
+  const jsonContent = JSON.stringify(data, null, 2);
+  const blob = new Blob([jsonContent], { type: 'application/json' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tempestra-analysis-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  window.URL.revokeObjectURL(url);
 });
 
 document.getElementById('share-btn').addEventListener('click', function() {
