@@ -1,9 +1,11 @@
 from datetime import date
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from fastapi import APIRouter, Query, HTTPException
+from pydantic import BaseModel
 
 from app.services.power_client import fetch_daily_series
+from app.services.chatbot_service_v3 import WeatherChatbotV3
 from app.utils.stats import (
     compute_exceedance_probability,
     wilson_confidence_interval,
@@ -12,6 +14,51 @@ from app.utils.stats import (
 
 
 router = APIRouter()
+
+# Initialize chatbot service
+chatbot = WeatherChatbotV3()
+
+
+# Pydantic models for chatbot
+class ChatbotRequest(BaseModel):
+    query: str
+    location: Optional[Dict] = None
+    target_date: Optional[str] = None
+    
+    def get_target_date(self) -> date:
+        """Parse and validate target date"""
+        if not self.target_date:
+            return date.today()
+        
+        try:
+            # Try different date formats
+            date_formats = [
+                '%Y-%m-%d',      # 2025-10-04
+                '%d/%m/%Y',      # 04/10/2025
+                '%m/%d/%Y',      # 10/04/2025
+                '%d-%m-%Y',      # 04-10-2025
+                '%Y/%m/%d',      # 2025/10/04
+            ]
+            
+            for fmt in date_formats:
+                try:
+                    return datetime.strptime(self.target_date, fmt).date()
+                except ValueError:
+                    continue
+            
+            # If no format works, try to parse as ISO format
+            return datetime.fromisoformat(self.target_date).date()
+            
+        except Exception:
+            # If all parsing fails, return today's date
+            return date.today()
+
+
+class ChatbotResponse(BaseModel):
+    response: str
+    user_type: Optional[str] = None
+    needs_location: bool = False
+    extracted_location: Optional[Dict] = None
 
 
 @router.get("/health")
@@ -166,5 +213,89 @@ def trend(
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/chatbot", response_model=ChatbotResponse)
+def chatbot_endpoint(request: ChatbotRequest) -> ChatbotResponse:
+    """
+    Chatbot endpoint for weather advice for farmers and fishermen
+    """
+    try:
+        # Analyze the query with conversation context
+        analysis = chatbot.analyze_query(request.query, request.location)
+        
+        # If location is needed, return a prompt for location
+        if analysis['needs_location']:
+            user_type = analysis['user_type'] or 'farmer'  # Default to farmer
+            response = chatbot._generate_location_prompt(user_type, analysis['extracted_location'])
+            return ChatbotResponse(
+                response=response,
+                user_type=analysis['user_type'],
+                needs_location=True,
+                extracted_location=analysis['extracted_location']
+            )
+        
+        # If we have location information, provide weather analysis
+        if request.location:
+            weather_analysis = chatbot.get_weather_analysis(
+                analysis['user_type'] or 'farmer',  # Default to farmer
+                request.location,
+                request.get_target_date()  # Use parsed date
+            )
+            
+            response = chatbot.generate_response(
+                weather_analysis,
+                analysis['query_intent'],
+                analysis['user_type'] or 'farmer',  # Default to farmer
+                request.query
+            )
+            
+            return ChatbotResponse(
+                response=response,
+                user_type=analysis['user_type'],
+                needs_location=False,
+                extracted_location=analysis['extracted_location']
+            )
+        
+        # If no location provided, ask for it
+        user_type = analysis['user_type'] or 'farmer'  # Default to farmer
+        response = chatbot._generate_location_prompt(user_type, analysis['extracted_location'])
+        return ChatbotResponse(
+            response=response,
+            user_type=analysis['user_type'],
+            needs_location=True,
+            extracted_location=analysis['extracted_location']
+        )
+        
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/chatbot/suggestions")
+def get_chatbot_suggestions() -> dict:
+    """
+    Get example queries for the chatbot
+    """
+    return {
+        "farmer_examples": [
+            "I'm a farmer and want to know if it's good to plant crops today",
+            "Is it safe to harvest in my field right now?",
+            "Should I delay irrigation due to weather conditions?",
+            "I'm farming in Cairo, Egypt - is the weather suitable for outdoor work?",
+            "What's the best time to plant crops in my area?"
+        ],
+        "fisher_examples": [
+            "I'm a fisherman and want to know if it's safe to go fishing today",
+            "Is it good to cruise in the Red Sea, Egypt right now?",
+            "Should I delay my fishing trip due to weather?",
+            "I'm fishing in Alexandria, Egypt - are conditions safe?",
+            "What's the best time to go fishing in my area?"
+        ],
+        "general_examples": [
+            "Tell me about the weather conditions for outdoor activities",
+            "Is it safe to be outside today?",
+            "What's the weather like for my planned activity?"
+        ]
+    }
 
 

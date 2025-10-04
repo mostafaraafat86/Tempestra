@@ -1395,6 +1395,308 @@
         opacity: 0.5;
         cursor: not-allowed;
       }
+      
+      /* Chatbot Styles */
+      .chatbot-section {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border-radius: var(--border-radius);
+        width: 100%;
+        padding: 30px;
+        box-shadow: var(--shadow-xl);
+        border: 1px solid var(--card-border);
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 30px;
+      }
+      
+      .chatbot-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: var(--primary-gradient);
+        opacity: 0.6;
+      }
+      
+      .chatbot-section h3 {
+        margin: 0 0 20px 0;
+        color: var(--text-primary);
+        font-size: 1.4rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      
+      .chatbot-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      
+      .chatbot-messages {
+        background: rgba(15, 23, 42, 0.6);
+        border-radius: 12px;
+        border: 1px solid var(--card-border);
+        padding: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+        min-height: 200px;
+      }
+      
+      .chatbot-message {
+        margin-bottom: 16px;
+        animation: slideInMessage 0.3s ease-out;
+      }
+      
+      .chatbot-message:last-child {
+        margin-bottom: 0;
+      }
+      
+      @keyframes slideInMessage {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      .message-content {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      
+      .message-avatar {
+        font-size: 1.5rem;
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(14, 165, 233, 0.1);
+        border-radius: 50%;
+        border: 1px solid rgba(14, 165, 233, 0.2);
+      }
+      
+      .message-text {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .message-text p {
+        margin: 0 0 8px 0;
+        color: var(--text-primary);
+        line-height: 1.5;
+      }
+      
+      .message-text p:last-child {
+        margin-bottom: 0;
+      }
+      
+      .message-text ul {
+        margin: 8px 0;
+        padding-left: 20px;
+      }
+      
+      .message-text li {
+        margin-bottom: 4px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+      }
+      
+      .message-text em {
+        color: var(--text-muted);
+        font-style: italic;
+      }
+      
+      .user-message .message-content {
+        flex-direction: row-reverse;
+      }
+      
+      .user-message .message-text {
+        background: rgba(14, 165, 233, 0.1);
+        border-color: rgba(14, 165, 233, 0.2);
+      }
+      
+      .user-message .message-avatar {
+        background: rgba(14, 165, 233, 0.2);
+        border-color: rgba(14, 165, 233, 0.3);
+      }
+      
+      .chatbot-input-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      
+      .chatbot-input-wrapper {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      
+      .chatbot-input-wrapper input {
+        flex: 1;
+        padding: 14px 18px;
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        font-size: 1rem;
+        font-family: inherit;
+        transition: var(--transition);
+        background: rgba(15, 23, 42, 0.6);
+        color: var(--text-primary);
+        backdrop-filter: blur(10px);
+      }
+      
+      .chatbot-input-wrapper input:focus {
+        outline: none;
+        border-color: transparent;
+        background: rgba(15, 23, 42, 0.8);
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2), 0 0 20px rgba(14, 165, 233, 0.1);
+        transform: translateY(-1px);
+      }
+      
+      .chatbot-input-wrapper input:hover {
+        border-color: rgba(14, 165, 233, 0.3);
+        background: rgba(15, 23, 42, 0.7);
+      }
+      
+      .chatbot-send-btn {
+        background: var(--primary-gradient);
+        color: white;
+        border: none;
+        padding: 14px 18px;
+        border-radius: 12px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 50px;
+        box-shadow: 0 8px 25px rgba(14, 165, 233, 0.3);
+      }
+      
+      .chatbot-send-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 30px rgba(14, 165, 233, 0.4);
+      }
+      
+      .chatbot-send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: 0 4px 15px rgba(14, 165, 233, 0.2);
+      }
+      
+      .send-icon {
+        font-size: 1.1rem;
+      }
+      
+      .chatbot-suggestions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      
+      .suggestion-btn {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--card-border);
+        color: var(--text-secondary);
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: inherit;
+      }
+      
+      .suggestion-btn:hover {
+        background: rgba(14, 165, 233, 0.1);
+        border-color: rgba(14, 165, 233, 0.3);
+        color: var(--text-primary);
+        transform: translateY(-1px);
+      }
+      
+      .chatbot-loading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-style: italic;
+      }
+      
+      .chatbot-loading::after {
+        content: '';
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(14, 165, 233, 0.3);
+        border-top: 2px solid #0ea5e9;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @media (max-width: 768px) {
+        .chatbot-section {
+          padding: 20px;
+        }
+        
+        .chatbot-messages {
+          max-height: 300px;
+          min-height: 150px;
+        }
+        
+        .message-content {
+          gap: 8px;
+        }
+        
+        .message-avatar {
+          width: 32px;
+          height: 32px;
+          font-size: 1.2rem;
+        }
+        
+        .message-text {
+          padding: 10px 12px;
+        }
+        
+        .chatbot-input-wrapper {
+          gap: 8px;
+        }
+        
+        .chatbot-input-wrapper input {
+          padding: 12px 14px;
+        }
+        
+        .chatbot-send-btn {
+          padding: 12px 14px;
+          min-width: 45px;
+        }
+        
+        .chatbot-suggestions {
+          gap: 6px;
+        }
+        
+        .suggestion-btn {
+          padding: 6px 10px;
+          font-size: 0.8rem;
+        }
+      }
     </style>
   </head>
   <body>
@@ -1437,6 +1739,47 @@
           
           <div id="map"></div>
           <div id="area-info" style="display: none; margin-top: 12px; padding: 12px; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 8px; font-size: 0.9rem; color: var(--text-secondary);"></div>
+        </div>
+        
+        <div class="chatbot-section">
+          <h3>🤖 Weather Assistant</h3>
+          <div class="help-banner">
+            <span class="help-icon">💬</span>
+            <span class="help-text">Ask me about weather conditions for farming, fishing, or any outdoor activity. I'll provide personalized advice based on NASA weather data!</span>
+          </div>
+          
+          <div class="chatbot-container">
+            <div class="chatbot-messages" id="chatbot-messages">
+              <div class="chatbot-message bot-message">
+                <div class="message-content">
+                  <div class="message-avatar">🤖</div>
+                  <div class="message-text">
+                    <p>Hello! I'm your weather assistant. I can help you with:</p>
+                    <ul>
+                      <li>🌾 <strong>Farming advice</strong> - Is it good to plant, harvest, or irrigate?</li>
+                      <li>🎣 <strong>Fishing conditions</strong> - Safe winds and visibility for fishing</li>
+                      <li>📍 <strong>Location-specific weather</strong> - Tell me where you are!</li>
+                    </ul>
+                    <p>Try asking: <em>"I'm a farmer in Cairo, Egypt - is it good to plant crops today?"</em></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="chatbot-input-container">
+              <div class="chatbot-input-wrapper">
+                <input type="text" id="chatbot-input" placeholder="Ask me about weather conditions..." autocomplete="off">
+                <button id="chatbot-send" class="chatbot-send-btn">
+                  <span class="send-icon">📤</span>
+                </button>
+              </div>
+              <div class="chatbot-suggestions" id="chatbot-suggestions">
+                <button class="suggestion-btn" data-query="I'm a farmer and want to know if it's good to farm right now">🌾 Farming advice</button>
+                <button class="suggestion-btn" data-query="I'm a fisherman and want to know if it's safe to go fishing">🎣 Fishing conditions</button>
+                <button class="suggestion-btn" data-query="Is it good to cruise in the Red Sea, Egypt right now?">🚢 Red Sea fishing</button>
+              </div>
+            </div>
+          </div>
         </div>
         
         <div class="persona-section">

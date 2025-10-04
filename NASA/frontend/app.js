@@ -522,6 +522,230 @@ document.getElementById('threshold').addEventListener('input', updateButtonState
 // Initialize button state
 updateButtonState();
 
+// Chatbot functionality
+let chatbotLocation = null;
+
+// Chatbot DOM elements
+const chatbotMessages = document.getElementById('chatbot-messages');
+const chatbotInput = document.getElementById('chatbot-input');
+const chatbotSendBtn = document.getElementById('chatbot-send');
+const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+
+// Add message to chatbot
+function addChatbotMessage(content, isUser = false) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `chatbot-message ${isUser ? 'user-message' : 'bot-message'}`;
+  
+  const messageContent = document.createElement('div');
+  messageContent.className = 'message-content';
+  
+  const avatar = document.createElement('div');
+  avatar.className = 'message-avatar';
+  avatar.textContent = isUser ? '👤' : '🤖';
+  
+  const messageText = document.createElement('div');
+  messageText.className = 'message-text';
+  
+  if (typeof content === 'string') {
+    // Convert markdown-like formatting to HTML
+    const formattedContent = content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    
+    messageText.innerHTML = `<p>${formattedContent}</p>`;
+  } else {
+    messageText.appendChild(content);
+  }
+  
+  messageContent.appendChild(avatar);
+  messageContent.appendChild(messageText);
+  messageDiv.appendChild(messageContent);
+  
+  chatbotMessages.appendChild(messageDiv);
+  chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+}
+
+// Add loading message
+function addLoadingMessage() {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'chatbot-message bot-message';
+  
+  const messageContent = document.createElement('div');
+  messageContent.className = 'message-content';
+  
+  const avatar = document.createElement('div');
+  avatar.className = 'message-avatar';
+  avatar.textContent = '🤖';
+  
+  const messageText = document.createElement('div');
+  messageText.className = 'message-text chatbot-loading';
+  messageText.textContent = 'Analyzing weather data...';
+  
+  messageContent.appendChild(avatar);
+  messageContent.appendChild(messageText);
+  messageDiv.appendChild(messageContent);
+  
+  chatbotMessages.appendChild(messageDiv);
+  chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+  
+  return messageDiv;
+}
+
+// Remove loading message
+function removeLoadingMessage(loadingDiv) {
+  if (loadingDiv && loadingDiv.parentNode) {
+    loadingDiv.parentNode.removeChild(loadingDiv);
+  }
+}
+
+// Send message to chatbot
+async function sendChatbotMessage(query) {
+  if (!query.trim()) return;
+  
+  // Add user message
+  addChatbotMessage(query, true);
+  
+  // Clear input
+  chatbotInput.value = '';
+  
+  // Disable send button
+  chatbotSendBtn.disabled = true;
+  
+  // Add loading message
+  const loadingDiv = addLoadingMessage();
+  
+  try {
+    // Prepare request data
+    const requestData = {
+      query: query,
+      location: chatbotLocation,
+      target_date: document.getElementById('date').value || new Date().toISOString().split('T')[0]
+    };
+    
+    // Send request to chatbot API
+    const response = await fetch('/api/chatbot', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Remove loading message
+    removeLoadingMessage(loadingDiv);
+    
+    // Add bot response
+    addChatbotMessage(data.response);
+    
+    // Update location if provided
+    if (data.extracted_location) {
+      chatbotLocation = data.extracted_location;
+    }
+    
+    // If location is needed, update the map location input
+    if (data.needs_location && data.extracted_location) {
+      const locationName = data.extracted_location.name;
+      document.getElementById('location-input').value = locationName;
+      
+      // Try to find coordinates for the location
+      const city = cities.find(c => 
+        c.name.toLowerCase().includes(locationName.toLowerCase()) ||
+        locationName.toLowerCase().includes(c.name.toLowerCase())
+      );
+      
+      if (city) {
+        addMarker(city.lat, city.lng);
+        map.setView([city.lat, city.lng], 10);
+        chatbotLocation = { lat: city.lat, lng: city.lng, name: city.name };
+      }
+    }
+    
+  } catch (error) {
+    console.error('Chatbot error:', error);
+    
+    // Remove loading message
+    removeLoadingMessage(loadingDiv);
+    
+    // Add error message
+    addChatbotMessage(`❌ Sorry, I encountered an error: ${error.message}\n\nPlease try again or check your connection.`);
+  } finally {
+    // Re-enable send button
+    chatbotSendBtn.disabled = false;
+  }
+}
+
+// Event listeners for chatbot
+chatbotSendBtn.addEventListener('click', () => {
+  const query = chatbotInput.value.trim();
+  if (query) {
+    sendChatbotMessage(query);
+  }
+});
+
+chatbotInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const query = chatbotInput.value.trim();
+    if (query) {
+      sendChatbotMessage(query);
+    }
+  }
+});
+
+// Suggestion button event listeners
+suggestionBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const query = btn.dataset.query;
+    if (query) {
+      sendChatbotMessage(query);
+    }
+  });
+});
+
+// Update chatbot location when map location changes
+function updateChatbotLocation() {
+  if (marker) {
+    const latLng = marker.getLatLng();
+    chatbotLocation = {
+      lat: latLng.lat,
+      lng: latLng.lng,
+      name: document.getElementById('location-input').value || `${latLng.lat.toFixed(4)}, ${latLng.lng.toFixed(4)}`
+    };
+  } else if (selectedArea) {
+    const center = selectedArea.getBounds().getCenter();
+    chatbotLocation = {
+      lat: center.lat,
+      lng: center.lng,
+      name: document.getElementById('location-input').value || `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`
+    };
+  }
+}
+
+// Update chatbot location when marker is added or area is selected
+const originalAddMarker = addMarker;
+addMarker = function(lat, lng) {
+  originalAddMarker(lat, lng);
+  updateChatbotLocation();
+};
+
+// Update chatbot location when area is selected
+const originalUpdateAreaSelectionUI = updateAreaSelectionUI;
+updateAreaSelectionUI = function() {
+  originalUpdateAreaSelectionUI();
+  updateChatbotLocation();
+};
+
+// Initialize chatbot location
+updateChatbotLocation();
+
 function fmtPct(x) { 
   return (x * 100).toFixed(1) + '%'; 
 }

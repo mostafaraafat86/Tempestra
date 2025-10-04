@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #5a1a1a;
+            color: #ff6b6b;
+        }
+        .success {
+            background: #1a5a1a;
+            color: #6bff6b;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            background: #333;
+            color: #fff;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 Chatbot Test Interface</h1>
+    
+    <div class="test-container">
+        <h2>Test Chatbot API</h2>
+        <input type="text" id="queryInput" placeholder="Enter your query (e.g., 'I'm a farmer and want to know if it's good to farm right now')" value="I'm a farmer and want to know if it's good to farm right now">
+        <br>
+        <button class="test-button" onclick="testChatbot()">Test Chatbot</button>
+        <button class="test-button" onclick="testWithLocation()">Test with Cairo Location</button>
+        <button class="test-button" onclick="testFisherman()">Test Fisherman Query</button>
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Quick Tests</h2>
+        <button class="test-button" onclick="runQuickTests()">Run All Quick Tests</button>
+        <div id="quickResults"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        async function testChatbot() {
+            const query = document.getElementById('queryInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!query.trim()) {
+                showResult('Please enter a query to test', 'error');
+                return;
+            }
+            
+            showResult('Testing chatbot...', '');
+            
+            try {
+                const response = await fetch(`${API_BASE}/chatbot`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        location: null,
+                        target_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult(`✅ Success!\n\nResponse: ${data.response}\n\nUser Type: ${data.user_type || 'Unknown'}\nNeeds Location: ${data.needs_location}\nExtracted Location: ${JSON.stringify(data.extracted_location)}`, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testWithLocation() {
+            const resultDiv = document.getElementById('result');
+            showResult('Testing with Cairo location...', '');
+            
+            try {
+                const response = await fetch(`${API_BASE}/chatbot`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: "I'm a farmer and want to know if it's good to farm right now",
+                        location: {
+                            lat: 30.0444,
+                            lng: 31.2357,
+                            name: "Cairo, Egypt"
+                        },
+                        target_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult(`✅ Success with Location!\n\nResponse: ${data.response}`, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testFisherman() {
+            const resultDiv = document.getElementById('result');
+            showResult('Testing fisherman query...', '');
+            
+            try {
+                const response = await fetch(`${API_BASE}/chatbot`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: "I'm a fisherman and want to know if it's safe to go fishing in the Red Sea, Egypt",
+                        location: {
+                            lat: 27.9158,
+                            lng: 34.3300,
+                            name: "Red Sea, Egypt"
+                        },
+                        target_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult(`✅ Fisherman Test Success!\n\nResponse: ${data.response}`, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function runQuickTests() {
+            const resultsDiv = document.getElementById('quickResults');
+            resultsDiv.innerHTML = '<div class="result">Running quick tests...</div>';
+            
+            const tests = [
+                {
+                    name: "Health Check",
+                    url: `${API_BASE}/health`,
+                    method: 'GET'
+                },
+                {
+                    name: "Chatbot Suggestions",
+                    url: `${API_BASE}/chatbot/suggestions`,
+                    method: 'GET'
+                },
+                {
+                    name: "Farmer Query (No Location)",
+                    url: `${API_BASE}/chatbot`,
+                    method: 'POST',
+                    body: {
+                        query: "I'm a farmer and want to know if it's good to plant crops",
+                        location: null
+                    }
+                },
+                {
+                    name: "Fisherman Query (No Location)",
+                    url: `${API_BASE}/chatbot`,
+                    method: 'POST',
+                    body: {
+                        query: "I'm a fisherman and want to know if it's safe to go fishing",
+                        location: null
+                    }
+                }
+            ];
+            
+            let results = '';
+            
+            for (const test of tests) {
+                try {
+                    const options = {
+                        method: test.method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    };
+                    
+                    if (test.body) {
+                        options.body = JSON.stringify(test.body);
+                    }
+                    
+                    const response = await fetch(test.url, options);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        results += `<div class="result success">✅ ${test.name}: Success</div>`;
+                    } else {
+                        results += `<div class="result error">❌ ${test.name}: HTTP ${response.status}</div>`;
+                    }
+                } catch (error) {
+                    results += `<div class="result error">❌ ${test.name}: ${error.message}</div>`;
+                }
+            }
+            
+            resultsDiv.innerHTML = results;
+        }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+        
+        // Test on page load
+        window.onload = function() {
+            runQuickTests();
+        };
+    </script>
+</body>
+</html>
