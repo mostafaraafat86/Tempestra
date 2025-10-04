@@ -11,6 +11,17 @@ let isSelectingArea = false;
 let selectionRectangle = null;
 let areaSelectionMode = false;
 
+// Disable/enable map dragging based on mode
+function updateMapInteractions() {
+  if (areaSelectionMode) {
+    map.dragging.disable();
+    map.getContainer().style.cursor = 'crosshair';
+  } else {
+    map.dragging.enable();
+    map.getContainer().style.cursor = '';
+  }
+}
+
 // Function to add marker at coordinates
 function addMarker(lat, lng) {
   if (marker) marker.remove();
@@ -40,6 +51,8 @@ function clearAreaSelection() {
   isSelectingArea = false;
   updateAreaSelectionUI();
 }
+
+// Drawing functions removed - focusing on area selection only
 
 // Function to update area selection UI
 function updateAreaSelectionUI() {
@@ -86,29 +99,47 @@ function calculateArea(bounds) {
   return area;
 }
 
-// Selection mode toggle functionality
+// Selection mode toggle functionality (toggles between Point and Area)
+let selectionMode = 'point'; // 'point', 'area'
+
 document.getElementById('selection-mode-btn').addEventListener('click', function() {
-  areaSelectionMode = !areaSelectionMode;
   const icon = this.querySelector('.mode-icon');
   const text = this.querySelector('.mode-text');
+  const drawMethod = document.getElementById('draw-method');
   
-  if (areaSelectionMode) {
+  // Toggle between point and area modes
+  if (selectionMode === 'point') {
+    selectionMode = 'area';
+    areaSelectionMode = true;
     this.classList.add('active');
-    icon.textContent = '📐';
+    icon.textContent = '🔷';
     text.textContent = 'Area Selection';
+    drawMethod.style.display = 'none';
+    
     // Clear any existing marker when switching to area mode
     if (marker) {
       map.removeLayer(marker);
       marker = null;
-      updateButtonState();
     }
+    
+    // Update map interactions for area selection mode
+    updateMapInteractions();
   } else {
+    selectionMode = 'point';
+    areaSelectionMode = false;
     this.classList.remove('active');
     icon.textContent = '📍';
     text.textContent = 'Point Selection';
+    drawMethod.style.display = 'none';
+    
     // Clear any existing area selection when switching to point mode
     clearAreaSelection();
+    
+    // Update map interactions for point selection mode
+    updateMapInteractions();
   }
+  
+  updateButtonState();
 });
 
 // Map click handler
@@ -124,28 +155,35 @@ map.on('click', (e) => {
 // Area selection functionality
 let startPoint = null;
 let endPoint = null;
+let startLatLng = null;
 
 // Mouse down handler for starting area selection
-map.on('mousedown', (e) => {
-  if (areaSelectionMode) {
+map.getContainer().addEventListener('mousedown', function(e) {
+  if (areaSelectionMode && e.target === map.getContainer() || e.target.classList.contains('leaflet-container') || e.target.classList.contains('leaflet-tile') || e.target.classList.contains('leaflet-tile-container')) {
     isSelectingArea = true;
-    startPoint = e.latlng;
+    
+    // Get the latlng from pixel coordinates
+    const containerPoint = map.mouseEventToContainerPoint(e);
+    startLatLng = map.containerPointToLatLng(containerPoint);
     
     // Clear existing area selection
-    clearAreaSelection();
+    if (selectionRectangle) {
+      map.removeLayer(selectionRectangle);
+      selectionRectangle = null;
+    }
+    selectedArea = null;
     
-    // Update button state
-    updateButtonState();
-    
-    // Prevent default map behavior
-    e.originalEvent.preventDefault();
+    e.preventDefault();
+    e.stopPropagation();
   }
 });
 
 // Mouse move handler for drawing selection rectangle
-map.on('mousemove', (e) => {
-  if (areaSelectionMode && isSelectingArea && startPoint) {
-    endPoint = e.latlng;
+map.getContainer().addEventListener('mousemove', function(e) {
+  if (areaSelectionMode && isSelectingArea && startLatLng) {
+    // Get the latlng from pixel coordinates
+    const containerPoint = map.mouseEventToContainerPoint(e);
+    const endLatLng = map.containerPointToLatLng(containerPoint);
     
     // Remove existing rectangle
     if (selectionRectangle) {
@@ -153,26 +191,37 @@ map.on('mousemove', (e) => {
     }
     
     // Create new rectangle
-    const bounds = L.latLngBounds([startPoint, endPoint]);
+    const bounds = L.latLngBounds([startLatLng, endLatLng]);
     selectionRectangle = L.rectangle(bounds, {
       color: '#0ea5e9',
       weight: 2,
       fillColor: '#0ea5e9',
       fillOpacity: 0.2,
-      dashArray: '5, 5'
+      dashArray: '5, 5',
+      interactive: false
     }).addTo(map);
+    
+    e.preventDefault();
+    e.stopPropagation();
   }
 });
 
 // Mouse up handler for finishing area selection
-map.on('mouseup', (e) => {
-  if (areaSelectionMode && isSelectingArea && startPoint && endPoint) {
-    const bounds = L.latLngBounds([startPoint, endPoint]);
+map.getContainer().addEventListener('mouseup', function(e) {
+  if (areaSelectionMode && isSelectingArea && startLatLng) {
+    // Get the latlng from pixel coordinates
+    const containerPoint = map.mouseEventToContainerPoint(e);
+    const endLatLng = map.containerPointToLatLng(containerPoint);
+    
+    const bounds = L.latLngBounds([startLatLng, endLatLng]);
     
     // Only create area selection if bounds are meaningful (not too small)
-    if (bounds.getSouthWest().distanceTo(bounds.getNorthEast()) > 100) { // 100m minimum
+    const distance = bounds.getSouthWest().distanceTo(bounds.getNorthEast());
+    
+    if (distance > 100) { // 100m minimum
       selectedArea = selectionRectangle;
       updateAreaSelectionUI();
+      updateButtonState();
       
       // Update location input with center coordinates
       const center = bounds.getCenter();
@@ -186,16 +235,22 @@ map.on('mouseup', (e) => {
     }
     
     isSelectingArea = false;
-    startPoint = null;
-    endPoint = null;
-    updateButtonState();
+    startLatLng = null;
+    
+    e.preventDefault();
+    e.stopPropagation();
   }
 });
 
-// Prevent map dragging when in area selection mode
-map.on('dragstart', (e) => {
-  if (areaSelectionMode) {
-    e.preventDefault();
+// Handle mouse leaving the map container
+map.getContainer().addEventListener('mouseleave', function(e) {
+  if (areaSelectionMode && isSelectingArea) {
+    isSelectingArea = false;
+    startLatLng = null;
+    if (selectionRectangle && !selectedArea) {
+      map.removeLayer(selectionRectangle);
+      selectionRectangle = null;
+    }
   }
 });
 
@@ -355,6 +410,8 @@ document.addEventListener('click', function(e) {
     suggestionsContainer.style.display = 'none';
   }
 });
+
+// Drawing button event listeners removed
 
 // Set default date to today
 document.getElementById('date').value = new Date().toISOString().split('T')[0];

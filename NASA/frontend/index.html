@@ -1358,6 +1358,43 @@
       .mode-text {
         font-size: 0.85rem;
       }
+      
+      /* Drawing controls styling */
+      .draw-controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .draw-btn {
+        padding: 10px 15px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(15, 20, 25, 0.6);
+        color: #e1e8ed;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+      }
+
+      .draw-btn:hover {
+        background: rgba(102, 126, 234, 0.2);
+        border-color: rgba(102, 126, 234, 0.3);
+      }
+
+      .draw-btn.secondary {
+        background: rgba(220, 53, 69, 0.2);
+        border-color: rgba(220, 53, 69, 0.3);
+      }
+
+      .draw-btn.secondary:hover {
+        background: rgba(220, 53, 69, 0.3);
+      }
+      
+      .draw-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
     </style>
   </head>
   <body>
@@ -1383,7 +1420,7 @@
             <div class="help-text">Type a city name and select from suggestions, or enter coordinates (lat, lng), or click on the map below</div>
           </div>
           
-          <div style="display: flex; gap: 12px; margin-bottom: 12px; align-items: center;">
+          <div style="display: flex; gap: 12px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
             <button id="selection-mode-btn" class="selection-mode-btn">
               <span class="mode-icon">📍</span>
               <span class="mode-text">Point Selection</span>
@@ -1391,6 +1428,11 @@
             <div class="help-text" style="margin: 0;">
               <strong>Click</strong> for point selection, <strong>Area Mode</strong> for drag selection
             </div>
+          </div>
+          
+          <!-- Drawing Area Method (removed) -->
+          <div id="draw-method" class="method-panel" style="display: none; margin-bottom: 16px;">
+            <!-- Drawing controls removed -->
           </div>
           
           <div id="map"></div>
