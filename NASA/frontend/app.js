@@ -6,11 +6,18 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 let marker = null;
+let selectedArea = null;
+let isSelectingArea = false;
+let selectionRectangle = null;
+let areaSelectionMode = false;
 
 // Function to add marker at coordinates
 function addMarker(lat, lng) {
   if (marker) marker.remove();
   marker = L.marker([lat, lng]).addTo(map);
+  
+  // Clear area selection when adding marker
+  clearAreaSelection();
   
   // Add a subtle animation to the marker
   marker.getElement().style.transition = 'transform 0.3s ease';
@@ -23,12 +30,173 @@ function addMarker(lat, lng) {
   updateButtonState();
 }
 
+// Function to clear area selection
+function clearAreaSelection() {
+  if (selectionRectangle) {
+    map.removeLayer(selectionRectangle);
+    selectionRectangle = null;
+  }
+  selectedArea = null;
+  isSelectingArea = false;
+  updateAreaSelectionUI();
+}
+
+// Function to update area selection UI
+function updateAreaSelectionUI() {
+  const areaInfo = document.getElementById('area-info');
+  if (selectedArea) {
+    const bounds = selectedArea.getBounds();
+    const center = bounds.getCenter();
+    const area = calculateArea(bounds);
+    areaInfo.innerHTML = `
+      <div class="area-selection-info">
+        <strong>Selected Area:</strong><br>
+        Center: ${center.lat.toFixed(4)}°, ${center.lng.toFixed(4)}°<br>
+        Bounds: ${bounds.getSouthWest().lat.toFixed(4)}° to ${bounds.getNorthEast().lat.toFixed(4)}° lat,<br>
+        ${bounds.getSouthWest().lng.toFixed(4)}° to ${bounds.getNorthEast().lng.toFixed(4)}° lng<br>
+        Approximate Area: ${area.toFixed(2)} km²
+      </div>
+    `;
+    areaInfo.style.display = 'block';
+  } else {
+    areaInfo.style.display = 'none';
+  }
+}
+
+// Function to calculate approximate area in km²
+function calculateArea(bounds) {
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  
+  // Convert to meters and calculate area
+  const lat1 = sw.lat * Math.PI / 180;
+  const lat2 = ne.lat * Math.PI / 180;
+  const dLat = (ne.lat - sw.lat) * Math.PI / 180;
+  const dLng = (ne.lng - sw.lng) * Math.PI / 180;
+  
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat1) * Math.cos(lat2) *
+          Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  
+  // Earth's radius in km
+  const R = 6371;
+  const area = R * R * c * Math.abs(ne.lat - sw.lat) * Math.PI / 180;
+  
+  return area;
+}
+
+// Selection mode toggle functionality
+document.getElementById('selection-mode-btn').addEventListener('click', function() {
+  areaSelectionMode = !areaSelectionMode;
+  const icon = this.querySelector('.mode-icon');
+  const text = this.querySelector('.mode-text');
+  
+  if (areaSelectionMode) {
+    this.classList.add('active');
+    icon.textContent = '📐';
+    text.textContent = 'Area Selection';
+    // Clear any existing marker when switching to area mode
+    if (marker) {
+      map.removeLayer(marker);
+      marker = null;
+      updateButtonState();
+    }
+  } else {
+    this.classList.remove('active');
+    icon.textContent = '📍';
+    text.textContent = 'Point Selection';
+    // Clear any existing area selection when switching to point mode
+    clearAreaSelection();
+  }
+});
+
 // Map click handler
 map.on('click', (e) => {
-  addMarker(e.latlng.lat, e.latlng.lng);
-  
-  // Update location input with coordinates
-  document.getElementById('location-input').value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+  if (!areaSelectionMode) {
+    addMarker(e.latlng.lat, e.latlng.lng);
+    
+    // Update location input with coordinates
+    document.getElementById('location-input').value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+  }
+});
+
+// Area selection functionality
+let startPoint = null;
+let endPoint = null;
+
+// Mouse down handler for starting area selection
+map.on('mousedown', (e) => {
+  if (areaSelectionMode) {
+    isSelectingArea = true;
+    startPoint = e.latlng;
+    
+    // Clear existing area selection
+    clearAreaSelection();
+    
+    // Update button state
+    updateButtonState();
+    
+    // Prevent default map behavior
+    e.originalEvent.preventDefault();
+  }
+});
+
+// Mouse move handler for drawing selection rectangle
+map.on('mousemove', (e) => {
+  if (areaSelectionMode && isSelectingArea && startPoint) {
+    endPoint = e.latlng;
+    
+    // Remove existing rectangle
+    if (selectionRectangle) {
+      map.removeLayer(selectionRectangle);
+    }
+    
+    // Create new rectangle
+    const bounds = L.latLngBounds([startPoint, endPoint]);
+    selectionRectangle = L.rectangle(bounds, {
+      color: '#0ea5e9',
+      weight: 2,
+      fillColor: '#0ea5e9',
+      fillOpacity: 0.2,
+      dashArray: '5, 5'
+    }).addTo(map);
+  }
+});
+
+// Mouse up handler for finishing area selection
+map.on('mouseup', (e) => {
+  if (areaSelectionMode && isSelectingArea && startPoint && endPoint) {
+    const bounds = L.latLngBounds([startPoint, endPoint]);
+    
+    // Only create area selection if bounds are meaningful (not too small)
+    if (bounds.getSouthWest().distanceTo(bounds.getNorthEast()) > 100) { // 100m minimum
+      selectedArea = selectionRectangle;
+      updateAreaSelectionUI();
+      
+      // Update location input with center coordinates
+      const center = bounds.getCenter();
+      document.getElementById('location-input').value = `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`;
+    } else {
+      // Too small selection, remove rectangle
+      if (selectionRectangle) {
+        map.removeLayer(selectionRectangle);
+        selectionRectangle = null;
+      }
+    }
+    
+    isSelectingArea = false;
+    startPoint = null;
+    endPoint = null;
+    updateButtonState();
+  }
+});
+
+// Prevent map dragging when in area selection mode
+map.on('dragstart', (e) => {
+  if (areaSelectionMode) {
+    e.preventDefault();
+  }
 });
 
 // City search functionality
@@ -279,8 +447,9 @@ function updateButtonState() {
   const button = document.getElementById('run');
   const date = document.getElementById('date').value;
   const threshold = document.getElementById('threshold').value;
+  const hasLocation = marker || selectedArea;
   
-  if (!marker || !date || !threshold) {
+  if (!hasLocation || !date || !threshold) {
     button.disabled = true;
     button.style.transform = 'scale(0.98)';
   } else {
@@ -352,14 +521,24 @@ document.getElementById('run').addEventListener('click', async () => {
   const out = document.getElementById('output');
   const button = document.getElementById('run');
   
-  if (!marker) {
+  if (!marker && !selectedArea) {
     out.className = 'result error';
-    out.innerHTML = 'Please select a location first. You can type coordinates (e.g., 30.0444, 31.2357) or click on the map.';
+    out.innerHTML = 'Please select a location first. You can type coordinates (e.g., 30.0444, 31.2357), click on the map for point selection, or use the Area Selection button for drag selection.';
     return;
   }
   
-  const lat = marker.getLatLng().lat.toFixed(4);
-  const lon = marker.getLatLng().lng.toFixed(4);
+  // Get coordinates - use marker if available, otherwise use area center
+  let lat, lon, locationType;
+  if (marker) {
+    lat = marker.getLatLng().lat.toFixed(4);
+    lon = marker.getLatLng().lng.toFixed(4);
+    locationType = 'point';
+  } else if (selectedArea) {
+    const center = selectedArea.getBounds().getCenter();
+    lat = center.lat.toFixed(4);
+    lon = center.lng.toFixed(4);
+    locationType = 'area';
+  }
   const varKey = document.getElementById('var').value;
   const date = document.getElementById('date').value;
   const threshold = document.getElementById('threshold').value;
@@ -431,7 +610,14 @@ document.getElementById('run').addEventListener('click', async () => {
     
     // Get the selected city name if available
     const locationInput = document.getElementById('location-input').value;
-    const displayLocation = locationInput && locationInput.includes(',') ? locationInput : `${lat}°, ${lon}°`;
+    let displayLocation;
+    if (locationType === 'area' && selectedArea) {
+      const bounds = selectedArea.getBounds();
+      const area = calculateArea(bounds);
+      displayLocation = `${lat}°, ${lon}° (Area: ${area.toFixed(2)} km²)`;
+    } else {
+      displayLocation = locationInput && locationInput.includes(',') ? locationInput : `${lat}°, ${lon}°`;
+    }
     
     out.innerHTML = `
       <div class="results-main">
@@ -457,6 +643,10 @@ document.getElementById('run').addEventListener('click', async () => {
         
         <div class="data-info">
           <span class="data-text">Based on ${formatNumber(data.n_samples)} years of NASA data (${data.period})</span>
+          <br>
+          <span class="data-source">Data Source: ${data.source ? data.source.join(', ') : 'NASA POWER (MERRA-2 derived)'}</span>
+          <br>
+          <span class="method-info">Method: ${data.method || 'DOY ±15d; binomial proportion (Wilson CI)'}</span>
         </div>
       </div>
     `;
@@ -565,14 +755,26 @@ function getRecommendation(riskLevel, persona, isBelowThreshold) {
 
 // Export functionality
 document.getElementById('export-csv').addEventListener('click', function() {
+  let locationInfo;
+  if (marker) {
+    locationInfo = `${marker.getLatLng().lat.toFixed(4)}, ${marker.getLatLng().lng.toFixed(4)}`;
+  } else if (selectedArea) {
+    const center = selectedArea.getBounds().getCenter();
+    const area = calculateArea(selectedArea.getBounds());
+    locationInfo = `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)} (Area: ${area.toFixed(2)} km²)`;
+  } else {
+    locationInfo = 'Not selected';
+  }
+  
   const data = {
-    location: marker ? `${marker.getLatLng().lat.toFixed(4)}, ${marker.getLatLng().lng.toFixed(4)}` : 'Not selected',
+    location: locationInfo,
+    location_type: marker ? 'point' : (selectedArea ? 'area' : 'none'),
     date: document.getElementById('date').value,
     variable: document.getElementById('var').value,
     threshold: document.getElementById('threshold').value,
     comparison: document.getElementById('comparison').value,
     window: document.getElementById('window').value,
-    probability: document.querySelector('.probability-display strong')?.textContent || 'N/A',
+    probability: document.querySelector('.probability-value')?.textContent || 'N/A',
     timestamp: new Date().toISOString()
   };
   
@@ -586,8 +788,127 @@ document.getElementById('export-csv').addEventListener('click', function() {
   window.URL.revokeObjectURL(url);
 });
 
-document.getElementById('export-pdf').addEventListener('click', function() {
-  alert('PDF export feature coming soon! For now, you can use the CSV export.');
+document.getElementById('export-pdf').addEventListener('click', async function() {
+  const button = this;
+  const originalText = button.textContent;
+  
+  try {
+    button.textContent = 'Generating PDF...';
+    button.disabled = true;
+    
+    // Create a new jsPDF instance
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    // Get the current analysis data
+    const probabilityValue = document.querySelector('.probability-value');
+    const probabilityLabel = document.querySelector('.probability-label');
+    const detailRows = document.querySelectorAll('.detail-row');
+    const dataText = document.querySelector('.data-text');
+    
+    if (!probabilityValue || !probabilityLabel) {
+      throw new Error('No analysis data available to export');
+    }
+    
+    // Set up PDF content
+    let yPosition = 20;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 20;
+    
+    // Title
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('TEMPESTRA - Weather Analysis Report', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 15;
+    
+    // Date and time
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Generated on: ${new Date().toLocaleString()}`, margin, yPosition);
+    yPosition += 10;
+    
+    // Main probability result
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    const probText = probabilityValue.textContent;
+    const probColor = probabilityValue.style.color || '#000000';
+    pdf.setTextColor(probColor);
+    pdf.text(probText, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 10;
+    
+    // Probability description
+    pdf.setTextColor('#000000');
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    const labelText = probabilityLabel.textContent;
+    const splitLabel = pdf.splitTextToSize(labelText, pageWidth - 2 * margin);
+    pdf.text(splitLabel, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 15;
+    
+    // Analysis details
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Analysis Details', margin, yPosition);
+    yPosition += 10;
+    
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    detailRows.forEach(row => {
+      const label = row.querySelector('.detail-label');
+      const value = row.querySelector('.detail-value');
+      if (label && value) {
+        // Clean text content to avoid encoding issues
+        const cleanLabel = label.textContent.replace(/[^\x00-\x7F]/g, '');
+        const cleanValue = value.textContent.replace(/[^\x00-\x7F]/g, '');
+        pdf.text(`${cleanLabel}: ${cleanValue}`, margin, yPosition);
+        yPosition += 7;
+      }
+    });
+    
+    yPosition += 10;
+    
+    // Data source information
+    if (dataText) {
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(dataText.textContent, margin, yPosition);
+      yPosition += 7;
+      
+      // Add data source details
+      const dataSource = document.querySelector('.data-source');
+      const methodInfo = document.querySelector('.method-info');
+      
+      if (dataSource) {
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(dataSource.textContent, margin, yPosition);
+        yPosition += 6;
+      }
+      
+      if (methodInfo) {
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'italic');
+        pdf.text(methodInfo.textContent, margin, yPosition);
+      }
+    }
+    
+    // Add footer
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Generated by TEMPESTRA - NASA Weather Likelihood Analysis', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    
+    // Save the PDF
+    const fileName = `tempestra-analysis-${new Date().toISOString().split('T')[0]}.pdf`;
+    pdf.save(fileName);
+    
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    alert(`Error generating PDF: ${error.message}`);
+  } finally {
+    button.textContent = originalText;
+    button.disabled = false;
+  }
 });
 
 document.getElementById('share-btn').addEventListener('click', function() {
@@ -643,19 +964,21 @@ function createProbabilityChart(data, varKey, comparison, threshold) {
         data: [probability * 100, oppositeProbability * 100],
         backgroundColor: [
           getRiskColor(probability, comparison),
-          'rgba(255, 255, 255, 0.1)'
+          '#64748b' // Fixed grey color instead of transparent white
         ],
         borderColor: [
           getRiskColor(probability, comparison),
-          'rgba(255, 255, 255, 0.2)'
+          '#64748b' // Consistent border color
         ],
-        borderWidth: 2
+        borderWidth: 2,
+        borderAlign: 'inner' // Better alignment of borders
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       aspectRatio: 1,
+      cutout: '60%', // Better doughnut appearance
       plugins: {
         legend: {
           position: 'bottom',
@@ -664,8 +987,17 @@ function createProbabilityChart(data, varKey, comparison, threshold) {
             font: {
               size: 11
             },
-            padding: 15
-          }
+            padding: 15,
+            usePointStyle: true, // Use point style for better alignment
+            pointStyle: 'circle'
+          },
+          align: 'center' // Center align legend
+        }
+      },
+      elements: {
+        arc: {
+          borderWidth: 2,
+          borderAlign: 'inner'
         }
       }
     }

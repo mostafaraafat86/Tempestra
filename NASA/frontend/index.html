@@ -559,6 +559,21 @@
         font-weight: 400;
       }
       
+      .data-source {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 500;
+        opacity: 0.8;
+      }
+      
+      .method-info {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-weight: 400;
+        opacity: 0.7;
+        font-style: italic;
+      }
+      
       
       .stats-grid {
         display: grid;
@@ -1289,6 +1304,60 @@
         outline: 2px solid #0ea5e9;
         outline-offset: 2px;
       }
+      
+      /* Area selection styling */
+      .area-selection-info {
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        line-height: 1.4;
+      }
+      
+      kbd {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.8rem;
+        color: var(--text-primary);
+      }
+      
+      /* Selection mode button styling */
+      .selection-mode-btn {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        color: var(--text-primary);
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: inherit;
+      }
+      
+      .selection-mode-btn:hover {
+        background: rgba(14, 165, 233, 0.1);
+        border-color: rgba(14, 165, 233, 0.3);
+        transform: translateY(-1px);
+      }
+      
+      .selection-mode-btn.active {
+        background: rgba(14, 165, 233, 0.2);
+        border-color: rgba(14, 165, 233, 0.5);
+        color: #7dd3fc;
+      }
+      
+      .mode-icon {
+        font-size: 1rem;
+      }
+      
+      .mode-text {
+        font-size: 0.85rem;
+      }
     </style>
   </head>
   <body>
@@ -1298,7 +1367,6 @@
           <img src="logog_white.png" alt="logo" style="height: 50px; width: auto;">
           TEMPESTRA
         </h1>
-        <p>🌍 NASA Space Apps Challenge 2025 - Weather Likelihood Analysis</p>
         <p style="font-size: 0.9rem; opacity: 0.7; margin-top: 8px;">Using NASA Earth observation data to predict weather conditions based on historical climate patterns</p>
       </div>
       
@@ -1315,7 +1383,18 @@
             <div class="help-text">Type a city name and select from suggestions, or enter coordinates (lat, lng), or click on the map below</div>
           </div>
           
+          <div style="display: flex; gap: 12px; margin-bottom: 12px; align-items: center;">
+            <button id="selection-mode-btn" class="selection-mode-btn">
+              <span class="mode-icon">📍</span>
+              <span class="mode-text">Point Selection</span>
+            </button>
+            <div class="help-text" style="margin: 0;">
+              <strong>Click</strong> for point selection, <strong>Area Mode</strong> for drag selection
+            </div>
+          </div>
+          
           <div id="map"></div>
+          <div id="area-info" style="display: none; margin-top: 12px; padding: 12px; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 8px; font-size: 0.9rem; color: var(--text-secondary);"></div>
         </div>
         
         <div class="persona-section">
@@ -1389,7 +1468,7 @@
           </div>
           <div class="help-text">Set your threshold value, choose whether to analyze above or below that value, and specify the time window for historical analysis</div>
           
-          <button id="run" class="compute-btn">🚀 Compute Probability</button>
+          <button id="run" class="compute-btn">Compute Probability</button>
           
           <div class="result" id="output">
             Select a location (type coordinates or click on the map) and click Compute to analyze weather likelihood
@@ -1446,6 +1525,8 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
